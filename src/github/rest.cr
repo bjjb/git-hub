@@ -93,3 +93,5 @@ class GitHub::REST
     body
   end
 end
+
+require "./rest/*"
