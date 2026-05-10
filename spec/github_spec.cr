@@ -97,6 +97,12 @@ describe GitHub do
     end
   end
 
+  describe ".version" do
+    it "returns a version string" do
+      GitHub.version.should match /\d+\.\d+\.\d+/
+    end
+  end
+
   describe "#get" do
     it "gets a resource" do
       response = gh.get("foo")
@@ -140,6 +146,12 @@ describe GitHub do
       json["method"].should eq "PUT"
       json["body"].should eq %({"name":"test"})
     end
+
+    it "puts a Hash body as JSON" do
+      response = gh.put("foo", {"name" => "hash"})
+      response.status.should eq HTTP::Status::OK
+      JSON.parse(response.body)["body"].should eq %({"name":"hash"})
+    end
   end
 
   describe "#patch" do
@@ -149,6 +161,12 @@ describe GitHub do
       json = JSON.parse(response.body)
       json["method"].should eq "PATCH"
       json["body"].should eq %({"name":"test"})
+    end
+
+    it "patches a Hash body as JSON" do
+      response = gh.patch("foo", {"name" => "hash"})
+      response.status.should eq HTTP::Status::OK
+      JSON.parse(response.body)["body"].should eq %({"name":"hash"})
     end
   end
 
