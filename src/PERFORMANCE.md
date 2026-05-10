@@ -37,7 +37,7 @@ Memory profiling options:
 | 1   | Fix `ObjectPaginator` parse  | Medium | Trivial | ✅ Done |
 | 2   | Stream paginated JSON output | Small  | Small   | Deferred |
 | 3   | Parallel multi-resource reqs | Medium | Medium  | ✅ Done |
-| 4   | Stream response bodies       | Medium | Medium  |        |
+| 4   | Stream response bodies       | Small  | Medium  | Deferred |
 
 ### 1. ✅ Double-parse in `ObjectPaginator#extract_items`
 
@@ -70,9 +70,13 @@ Benchmark (10 GETs, 50ms server latency each):
 
 Pool size is 4 by default, bounding concurrency.
 
-### 4. Stream response bodies
+### 4. Deferred: Stream response bodies
 
 Every `throttle` call reads the full `response.body`
-into a `String`. For commands that just pipe output, use
-`HTTP::Client#get` with a block to stream the body
-directly to the output IO.
+into a `String`. Streaming via `body_io` would save
+memory, but benchmarks show negligible throughput
+improvement at typical API response sizes (1–10KB).
+Only significant (10–14% faster, ~35% less memory) at
+100KB+. The implementation is invasive — `throttle`,
+`parallel`, and error handling all need reworking —
+so not worth the complexity yet.
