@@ -36,7 +36,7 @@ Memory profiling options:
 | --- | ---------------------------- | ------ | ------ | ------ |
 | 1   | Fix `ObjectPaginator` parse  | Medium | Trivial | ✅ Done |
 | 2   | Stream paginated JSON output | Small  | Small   | Deferred |
-| 3   | Parallel multi-resource reqs | Medium | Medium  |        |
+| 3   | Parallel multi-resource reqs | Medium | Medium  | ✅ Done |
 | 4   | Stream response bodies       | Medium | Medium  |        |
 
 ### 1. ✅ Double-parse in `ObjectPaginator#extract_items`
@@ -55,15 +55,20 @@ O(total_items), but benchmarks show no throughput
 improvement — the gain is only peak RSS for very large
 collections. Not worth the complexity yet.
 
-### 3. Parallel multi-resource requests
+### 3. ✅ Parallel multi-resource requests
 
-`get`, `post`, etc. iterate `args.each` sequentially.
-These are independent network calls and could run in
-parallel fibers with a `Channel` for ordered collection.
+Fixed. `REST` now uses a channel-based connection pool
+(`REST::Pool`) instead of a single `HTTP::Client`. CLI
+commands spawn fibers for each resource arg, with
+results collected in order. Single-arg requests run
+inline with no overhead.
 
-Requires a connection pool — the current single
-`HTTP::Client` is not fiber-safe. A channel-based pool
-of N clients would suffice.
+Benchmark (10 GETs, 50ms server latency each):
+
+    sequential (old)  1.86 (536.70ms)  691kB/op  3.33× slower
+    parallel (new)    6.20 (161.25ms)  704kB/op  fastest
+
+Pool size is 4 by default, bounding concurrency.
 
 ### 4. Stream response bodies
 

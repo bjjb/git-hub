@@ -1,5 +1,6 @@
 require "option_parser"
 require "json"
+require "wait_group"
 
 # :nodoc:
 class GitHub
@@ -73,6 +74,21 @@ class GitHub
   # Builds a request body from KEY=VALUE assignments.
   private def body(assignments : Enumerable(String)) : String
     GitHub.parse_assignments(assignments.to_a, {} of String => String).to_json
+  end
+
+  # Runs a block for each item in parallel, returning results
+  # in the original order. For a single item, runs inline.
+  private def parallel(items : Array(String), &block : String -> String) : Array(String)
+    return items.map { |item| block.call(item) } if items.size <= 1
+    results = Array(String).new(items.size, "")
+    WaitGroup.wait do |group|
+      items.each_with_index do |item, i|
+        group.spawn do
+          results[i] = block.call(item)
+        end
+      end
+    end
+    results
   end
 
   getter option_parser do
@@ -159,15 +175,17 @@ class GitHub
         op.on("-a", "--all", "fetch all pages") { all = true }
         op.unknown_args do |args, xargs|
           q = GitHub.parse_assignments(xargs, {} of String => Array(String))
-          args.each do |resource|
+          parallel(args) do |resource|
             if all
-              self.paginate(resource, q).each.to_json(output)
+              io = IO::Memory.new
+              self.paginate(resource, q).each.to_json(io)
+              io.to_s
             else
               response = get(resource, q)
               raise CLI::Error.new(nil, 1) unless response.status.success?
-              response.body.to_s(output)
+              response.body
             end
-          end
+          end.each(&.to_s(output))
         end
       end
       op.on "post", "creates resources" do
@@ -186,11 +204,11 @@ class GitHub
         EOT
         op.unknown_args do |args, xargs|
           b = xargs.empty? ? body(input) : body(xargs)
-          args.each do |resource|
+          parallel(args) do |resource|
             response = post(resource, b)
             raise CLI::Error.new(nil, 1) unless response.status.success?
-            response.body.to_s(output)
-          end
+            response.body
+          end.each(&.to_s(output))
         end
       end
       op.on "put", "creates/replaces resources" do
@@ -202,11 +220,11 @@ class GitHub
         EOT
         op.unknown_args do |args, xargs|
           b = xargs.empty? ? body(input) : body(xargs)
-          args.each do |resource|
+          parallel(args) do |resource|
             response = put(resource, b)
             raise CLI::Error.new(nil, 1) unless response.status.success?
-            response.body.to_s(output)
-          end
+            response.body
+          end.each(&.to_s(output))
         end
       end
       op.on "patch", "modifies resources" do
@@ -218,11 +236,11 @@ class GitHub
         EOT
         op.unknown_args do |args, xargs|
           b = xargs.empty? ? body(input) : body(xargs)
-          args.each do |resource|
+          parallel(args) do |resource|
             response = patch(resource, b)
             raise CLI::Error.new(nil, 1) unless response.status.success?
-            response.body.to_s(output)
-          end
+            response.body
+          end.each(&.to_s(output))
         end
       end
       op.on "delete", "deletes resources" do
@@ -232,9 +250,10 @@ class GitHub
         Options:
         EOT
         op.unknown_args do |args, _|
-          args.each do |resource|
+          parallel(args) do |resource|
             response = delete(resource)
             raise CLI::Error.new(nil, 1) unless response.status.success?
+            ""
           end
         end
       end
