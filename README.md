@@ -1,7 +1,5 @@
 # git-hub
 
-[![CI][badge]][ci]
-
 [git][1] + [hub][2] = a git subcommand for GitHub.
 
 Adds a `hub` command to git that wraps the [GitHub
@@ -66,5 +64,3 @@ puts gh.get("user").body
 [2]: https://github.com
 [3]: https://docs.github.com/en/rest
 [4]: https://crystal-lang.org
-[badge]: https://github.com/bjjb/git-hub/actions/workflows/ci.yml/badge.svg
-[ci]: https://github.com/bjjb/git-hub/actions/workflows/ci.yml
