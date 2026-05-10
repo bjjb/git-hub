@@ -6,6 +6,10 @@ end
 
 # An HTTP client for the GitHub REST API.
 class GitHub::REST
+  # The most recently observed rate limit, or nil if no
+  # requests have been made yet.
+  getter rate_limit : RateLimit?
+
   # Creates a new GitHub HTTP REST client for the given uri, which calls its
   # token proc and sets the Authorization header for every request.
   def initialize(@uri : URI, token : -> String, user_agent = "bjjb/git-hub/rest")
@@ -22,52 +26,86 @@ class GitHub::REST
 
   # Gets a response for the given resource.
   def get(resource)
-    @http.get(uri(resource))
+    throttle { @http.get(uri(resource)) }
   end
 
   # Gets a response with query params.
   def get(resource, query)
-    @http.get(uri(resource, query(query)))
+    throttle { @http.get(uri(resource, query(query))) }
   end
 
   # Creates a new resource and returns the response.
   def post(collection, body)
-    @http.post(uri(collection), body: body(body))
+    throttle { @http.post(uri(collection), body: body(body)) }
   end
 
   # Creates a new resource with query params.
   def post(collection, query, body)
-    @http.post(uri(collection, query(query)), body: body(body))
+    throttle { @http.post(uri(collection, query(query)), body: body(body)) }
   end
 
   # Replaces a resource and returns the response.
   def put(resource, body)
-    @http.put(uri(resource), body: body(body))
+    throttle { @http.put(uri(resource), body: body(body)) }
   end
 
   # Replaces a resource with query params.
   def put(resource, query, body)
-    @http.put(uri(resource, query(query)), body: body(body))
+    throttle { @http.put(uri(resource, query(query)), body: body(body)) }
   end
 
   # Patches a resource and returns the response.
   def patch(resource, body)
-    @http.patch(uri(resource), body: body(body))
+    throttle { @http.patch(uri(resource), body: body(body)) }
   end
 
   # Patches a resource with query params.
   def patch(resource, query, body)
-    @http.patch(uri(resource, query(query)), body: body(body))
+    throttle { @http.patch(uri(resource, query(query)), body: body(body)) }
   end
 
   # Deletes a resource and returns the response.
   def delete(resource)
-    @http.delete(uri(resource))
+    throttle { @http.delete(uri(resource)) }
   end
 
   # Deletes a resource with query params.
   def delete(resource, query)
-    @http.delete(uri(resource, query(query)))
+    throttle { @http.delete(uri(resource, query(query))) }
+  end
+
+  # Returns a paginated collection over a list endpoint.
+  # Fetches the first page to detect the response shape, then
+  # returns an `ArrayPaginator` or `ObjectPaginator` accordingly.
+  def paginate(resource, query = nil) : Paginator(JSON::Any)
+    full = URI.parse(@uri.to_s)
+    full.path = "#{full.path}/#{resource.lstrip('/')}"
+    query.try { full.query_params = self.query(query) }
+    response = throttle { @http.get(full.request_target) }
+    pull = JSON::PullParser.new(response.body)
+    case pull.kind
+    when .begin_object?
+      ObjectPaginator(JSON::Any).new(full, @http, response)
+    else
+      ArrayPaginator(JSON::Any).new(full, @http, response)
+    end
+  end
+
+  # Executes a request block, respecting rate limits. Waits if
+  # the current limit is exhausted, and retries once on 429.
+  private def throttle(&) : HTTP::Client::Response
+    if (rl = @rate_limit) && rl.exhausted?
+      sleep rl.wait_time
+    end
+    response = yield
+    @rate_limit = RateLimit.from(response) || @rate_limit
+    if response.status == HTTP::Status::TOO_MANY_REQUESTS
+      retry_after = response.headers["Retry-After"]?.try(&.to_i) || 60
+      sleep retry_after.seconds
+      response = yield
+      @rate_limit = RateLimit.from(response) || @rate_limit
+    end
+    response
   end
 
   private def uri(resource, query : URI::Params? = nil)

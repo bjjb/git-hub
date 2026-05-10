@@ -14,23 +14,21 @@ end
 # `Cursor` that follows `Link` headers across pages, yielding
 # one deserialized item at a time.
 #
-# ```
-# paginator = GitHub::REST::Paginator(JSON::Any).new(uri, http)
-# paginator.each { |item| puts item } # first pass
-# paginator.each { |item| puts item } # second pass — fresh cursor
-# paginator.each.to_json(STDOUT)      # streams a JSON array
-# ```
-class GitHub::REST::Paginator(T)
+# Use `ArrayPaginator` for endpoints returning bare JSON arrays,
+# and `ObjectPaginator` for endpoints returning wrapper objects
+# (e.g. `{"total_count": N, "items": [...]}`). The `REST#paginate`
+# factory detects the shape automatically.
+abstract class GitHub::REST::Paginator(T)
   include Iterable(T)
   include Enumerable(T)
 
-  def initialize(@uri : URI, @http : HTTP::Client)
+  def initialize(@uri : URI, @http : HTTP::Client,
+                 @initial : HTTP::Client::Response? = nil)
   end
 
-  # Returns a fresh iterator over the collection.
-  def each : Cursor(T)
-    Cursor(T).new(@uri, @http)
-  end
+  # Returns a fresh iterator over the collection. The first
+  # call uses the initial response if one was provided.
+  abstract def each : Cursor(T)
 
   # Yields each item to the block.
   def each(&) : Nil
@@ -45,7 +43,7 @@ class GitHub::REST::Paginator(T)
   # The single-pass iterator that does the actual fetching.
   # Follows `Link: rel="next"` headers and exposes all four
   # link relations as getters.
-  class Cursor(T)
+  abstract class Cursor(T)
     include Iterator(T)
 
     # The URI of the next page, or nil if exhausted.
@@ -57,10 +55,15 @@ class GitHub::REST::Paginator(T)
     # The URI of the last page.
     getter last_link : URI?
 
-    def initialize(@uri : URI, @http : HTTP::Client)
+    def initialize(@uri : URI, @http : HTTP::Client,
+                   initial : HTTP::Client::Response? = nil)
       @buffer = [] of T
       @index = 0
       @started = false
+      return unless initial
+      parse_links(initial)
+      @buffer = extract_items(initial.body)
+      @started = true
     end
 
     def next
@@ -72,12 +75,16 @@ class GitHub::REST::Paginator(T)
       @buffer[(@index &+= 1) - 1]
     end
 
+    # Extracts items from a response body.
+    private abstract def extract_items(body : String) : Array(T)
+
     private def fetch_page
       uri = @started ? @next_link : @uri
       return if uri.nil?
       response = @http.get(uri.request_target)
+      raise Error.new(response) unless response.status.success?
       parse_links(response)
-      @buffer = Array(T).from_json(response.body)
+      @buffer = extract_items(response.body)
       @index = 0
       @started = true
     end

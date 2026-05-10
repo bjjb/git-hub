@@ -138,8 +138,9 @@ class GitHub
         op.unknown_args { output.puts token.call }
       end
       op.on "get", "gets resource" do
+        all = false
         op.banner = <<-EOT
-        Usage: #{prog} get RESOURCES -- FILTERS
+        Usage: #{prog} get [options] RESOURCES -- FILTERS
             Gets resources from the server sequentially. Common filters can be
             specified after '--', in the form NAME=VALUE. Each response body is
             printed to standard out. Stops and exits non-zero if a request gets
@@ -150,14 +151,22 @@ class GitHub
 
             # Search for repos
             #{prog} get search/repositories -- q=crystal+language:crystal
+
+            # List all issues
+            #{prog} get -a repos/owner/repo/issues | jq '.[].title'
         Options:
         EOT
+        op.on("-a", "--all", "fetch all pages") { all = true }
         op.unknown_args do |args, xargs|
           q = GitHub.parse_assignments(xargs, {} of String => Array(String))
           args.each do |resource|
-            response = get(resource, q)
-            raise CLI::Error.new(nil, 1) unless response.status.success?
-            response.body.to_s(output)
+            if all
+              self.paginate(resource, q).each.to_json(output)
+            else
+              response = get(resource, q)
+              raise CLI::Error.new(nil, 1) unless response.status.success?
+              response.body.to_s(output)
+            end
           end
         end
       end

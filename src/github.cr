@@ -75,6 +75,11 @@ class GitHub
     @rest.delete(resource)
   end
 
+  # Returns a paginated collection over a list endpoint.
+  def paginate(resource, query = nil)
+    @rest.paginate(resource, query)
+  end
+
   # A local git repo with remotes pointing to a GitHub repository.
   class Repo
     getter remotes = {} of String => URI
