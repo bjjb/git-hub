@@ -47,7 +47,11 @@ class GitHub::REST::ObjectPaginator(T) < GitHub::REST::Paginator(T)
         @total_count = tc.as_i64
       end
       _, items = json.find { |_, v| v.raw.is_a?(Array) } || return [] of T
-      Array(T).from_json(items.to_json)
+      {% if T == JSON::Any %}
+        items.as_a
+      {% else %}
+        Array(T).from_json(items.to_json)
+      {% end %}
     end
   end
 end
