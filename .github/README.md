@@ -25,6 +25,32 @@ The Crystal version is pinned in the container image
 tag in `workflows/ci.yml`. Bump it to match the
 minimum version in `shard.yml`.
 
+## Repository Settings
+
+| Setting                          | Value     |
+|----------------------------------|-----------|
+| Visibility                       | public    |
+| Default branch                   | `main`    |
+| License                          | MIT       |
+| Issues                           | enabled   |
+| Wiki                             | enabled   |
+| Projects                         | enabled   |
+| Discussions                      | disabled  |
+| Forking                          | allowed   |
+
+## Security
+
+| Feature                          | Status    |
+|----------------------------------|-----------|
+| Secret scanning                  | enabled   |
+| Secret scanning push protection  | enabled   |
+| Private vulnerability reporting  | enabled   |
+| Dependabot alerts                | enabled   |
+| Code scanning                    | n/a       |
+
+See [SECURITY.md](../SECURITY.md) for the reporting
+policy.
+
 [ci]: workflows/ci.yml
 [img]: https://hub.docker.com/r/crystallang/crystal
 [cache]: https://github.com/actions/cache
