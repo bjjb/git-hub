@@ -329,6 +329,7 @@ class GitHub
         end
       end
       op.on "release", "manages releases" do
+        all = false
         release_name : String? = nil
         release_body : String? = nil
         draft = false
@@ -344,6 +345,7 @@ class GitHub
         EOT
         op.on("-n NAME", "--name NAME", "release name") { |name| release_name = name }
         op.on("-b DESC", "--body DESC", "release body") { |desc| release_body = desc }
+        op.on("-a", "--all", "fetch all pages") { all = true }
         op.on("--draft", "create as draft") { draft = true }
         op.on("--prerelease", "mark as prerelease") { prerelease = true }
         op.unknown_args do |args|
@@ -369,12 +371,14 @@ class GitHub
             end
             response.body.to_s(output)
           when "list"
-            response = get("repos/#{full_name}/releases")
-            unless response.status.success?
-              error.puts "release list failed: #{response.status} #{response.body}"
-              raise CLI::Error.new(nil, 1)
+            resource = "repos/#{full_name}/releases"
+            if all
+              self.paginate(resource).each.to_json(output)
+            else
+              response = get(resource)
+              raise CLI::Error.new(nil, 1) unless response.status.success?
+              response.body.to_s(output)
             end
-            response.body.to_s(output)
           when "delete"
             tag = args.first? || raise CLI::Error.new("No tag specified.", 1)
             # GitHub needs release ID; get it by tag first

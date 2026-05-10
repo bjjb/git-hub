@@ -124,6 +124,34 @@ describe GitHub do
     {% end %}
   end
 
+  describe "#run release" do
+    tmpdir = File.tempname("git-hub-release")
+
+    before_all do
+      Dir.mkdir(tmpdir)
+      Dir.cd(tmpdir) do
+        Process.run("git", %w(init))
+        Process.run("git", ["remote", "add", "origin", "https://github.com/bjjb/git-hub.git"])
+      end
+    end
+
+    after_all { FileUtils.rm_rf(tmpdir) }
+
+    it "lists releases with paginator when -a is given" do
+      stdout = IO::Memory.new
+      code = Dir.cd(tmpdir) { gh.run(["release", "list", "-a"], output: stdout) }
+      code.should eq 0
+    end
+
+    it "lists releases with a single GET by default" do
+      stdout = IO::Memory.new
+      code = Dir.cd(tmpdir) { gh.run(["release", "list"], output: stdout) }
+      code.should eq 0
+      json = JSON.parse(stdout.to_s)
+      json["uri"].as_s.should contain "/repos/bjjb/git-hub/releases"
+    end
+  end
+
   describe "#run issue" do
     tmpdir = File.tempname("git-hub-issues")
 
