@@ -45,6 +45,14 @@ describe GitHub::REST::ArrayPaginator do
     paginator.to_a.should eq [1, 2, 3, 4, 5, 6, 7, 8]
   end
 
+  it "yields all items via block form" do
+    http = HTTP::Client.new(client_uri)
+    paginator = GitHub::REST::ArrayPaginator(Int32).new(base, http)
+    collected = [] of Int32
+    paginator.each { |item| collected << item }
+    collected.should eq [1, 2, 3, 4, 5, 6, 7, 8]
+  end
+
   it "is multi-pass" do
     http = HTTP::Client.new(client_uri)
     paginator = GitHub::REST::ArrayPaginator(Int32).new(base, http)
@@ -175,11 +183,13 @@ describe GitHub::REST::ObjectPaginator do
     paginator.to_a.should eq [1, 2, 3, 4, 5]
   end
 
-  it "exposes total_count" do
+  it "yields all items and updates total_count via block form" do
     http = HTTP::Client.new(client_uri)
     paginator = GitHub::REST::ObjectPaginator(Int32).new(base, http)
     paginator.total_count.should be_nil
-    paginator.to_a
+    collected = [] of Int32
+    paginator.each { |item| collected << item }
+    collected.should eq [1, 2, 3, 4, 5]
     paginator.total_count.should eq 5
   end
 
