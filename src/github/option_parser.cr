@@ -229,18 +229,18 @@ class GitHub
           end
         end
       end
-      op.on "current", "gets the current project or namespace" do
+      op.on "current", "gets the current repo or namespace" do
         quiet = false
         show_type = false
         show_path = false
         op.banner = <<-EOT
         Usage: #{prog} current [options]
             Prints information about the current working directory's GitHub
-            project or namespace. Exits non-zero if neither can be determined.
+            repo or namespace. Exits non-zero if neither can be determined.
         Options:
         EOT
         op.on("-q", "--quiet", "exit 0/1 without printing") { quiet = true }
-        op.on("-t", "--type", "print 'project' or 'namespace'") { show_type = true }
+        op.on("-t", "--type", "print 'repo' or 'namespace'") { show_type = true }
         op.on("-p", "--path", "print the owner/repo path") { show_path = true }
         op.unknown_args do |args|
           next if done?
@@ -249,9 +249,9 @@ class GitHub
           end
           path : String? = nil
           type : String? = nil
-          if project = project?
-            path = project.full_name
-            type = "project"
+          if repo = repo?
+            path = repo.full_name
+            type = "repo"
           elsif ns = namespace?
             path = ns
             type = "namespace"
@@ -266,7 +266,7 @@ class GitHub
           elsif show_path
             output.puts path
           else
-            if type == "project"
+            if type == "repo"
               response = get("repos/#{path}")
               raise CLI::Error.new(nil, 2) unless response.status.success?
               response.body.to_s(output)
@@ -285,7 +285,7 @@ class GitHub
         prerelease = false
         op.banner = <<-EOT
         Usage: #{prog} release COMMAND [options]
-            Manages releases for the current project.
+            Manages releases for the current repo.
         Commands:
             create [TAG]   Create a release
             list           List releases
@@ -299,8 +299,8 @@ class GitHub
         op.unknown_args do |args|
           next if done?
           command = args.shift?
-          project = project? || raise CLI::Error.new("Not in a project directory.", 1)
-          full_name = project.full_name
+          repo = repo? || raise CLI::Error.new("Not in a repo directory.", 1)
+          full_name = repo.full_name
           case command
           when "create"
             tag = args.first? || raise CLI::Error.new("No tag specified.", 1)

@@ -161,12 +161,12 @@ describe GitHub do
       Dir.cd(tmpdir) { GitHub.git(name) }.user.to_s.should eq user
     end
 
-    it "detects the project if there's a .git/config" do
+    it "detects the repo if there's a .git/config" do
       Dir.cd(tmpdir) do
         github = GitHub.git(name)
-        github.project?.should be_nil
+        github.repo?.should be_nil
         Process.run("git", Process.parse_arguments("remote add origin https://github.com/foo/bar.git"))
-        github.project?.should_not be_nil
+        github.repo?.should_not be_nil
       end
     end
   end

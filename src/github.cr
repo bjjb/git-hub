@@ -26,7 +26,7 @@ class GitHub
   getter user : String
 
   # Makes a new GitHub which can make requests to uri using the result of
-  # calling token, and treats home as the root of its project tree.
+  # calling token, and treats home as the root of its repo tree.
   def initialize(@uri = @@uri, @token = @@token, @home = @@home, @user = @@user)
     @rest = REST.new(@uri, -> { @token.call }, "bjjb/git-hub@#{VERSION}")
   end
@@ -75,8 +75,8 @@ class GitHub
     @rest.delete(resource)
   end
 
-  # A git project with remotes pointing to a GitHub repository.
-  class Project
+  # A local git repo with remotes pointing to a GitHub repository.
+  class Repo
     getter remotes = {} of String => URI
     getter workdir : Path
 
@@ -98,15 +98,15 @@ class GitHub
     end
   end
 
-  # Returns a Project if the given path represents a git project.
-  def project?(path = ".")
+  # Returns a Repo if the given path represents a git repository.
+  def repo?(path = ".")
     return unless File.exists?(Path[path, ".git/config"].expand(home: true))
-    project = Project.new(Path[path].expand(home: true))
-    project unless project.remotes.empty?
+    repo = Repo.new(Path[path].expand(home: true))
+    repo unless repo.remotes.empty?
   end
 
   # Returns the namespace path if the given path is within home but not a
-  # project.
+  # repo.
   def namespace?(path = ".") : String?
     expanded = Path[path].expand(home: true)
     return nil if File.exists?(expanded / ".git/config")
