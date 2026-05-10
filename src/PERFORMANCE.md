@@ -32,40 +32,28 @@ Memory profiling options:
 
 ## Opportunities
 
-| #   | Change                       | Impact | Effort  |
-| --- | ---------------------------- | ------ | ------- |
-| 1   | Fix `ObjectPaginator` parse  | Medium | Trivial |
-| 2   | Stream paginated JSON output | Large  | Small   |
-| 3   | Parallel multi-resource reqs | Medium | Medium  |
-| 4   | Stream response bodies       | Medium | Medium  |
+| #   | Change                       | Impact | Effort | Status |
+| --- | ---------------------------- | ------ | ------ | ------ |
+| 1   | Fix `ObjectPaginator` parse  | Medium | Trivial | ✅ Done |
+| 2   | Stream paginated JSON output | Small  | Small   | Deferred |
+| 3   | Parallel multi-resource reqs | Medium | Medium  |        |
+| 4   | Stream response bodies       | Medium | Medium  |        |
 
-### 1. Double-parse in `ObjectPaginator#extract_items`
+### 1. ✅ Double-parse in `ObjectPaginator#extract_items`
 
-`extract_items` parses JSON, finds the array,
-re-serializes with `to_json`, then re-parses with
-`from_json` — three passes per page. Since `T` is
-`JSON::Any`, the items are already parsed. Replace
-with `items.as_a`.
+Fixed. `extract_items` now returns `items.as_a` directly
+when `T` is `JSON::Any` (compile-time macro branch),
+skipping the serialize/reparse round-trip. ~2.8× faster
+extraction, ~2.4× less memory per page.
 
-### 2. Stream paginated JSON output
+### 2. Deferred: Stream paginated JSON output
 
 `paginate(...).each.to_json(output)` collects all items
-across all pages before serializing. For large
-collections this holds everything in memory. Stream
-instead:
-
-```crystal
-output << '['
-first = true
-paginate(resource, q).each do |item|
-  output << ',' unless first
-  item.to_json(output)
-  first = false
-end
-output << ']'
-```
-
-Keeps at most one page in memory at a time.
+across all pages before serializing. Streaming would
+bound peak memory to O(page_size) instead of
+O(total_items), but benchmarks show no throughput
+improvement — the gain is only peak RSS for very large
+collections. Not worth the complexity yet.
 
 ### 3. Parallel multi-resource requests
 
