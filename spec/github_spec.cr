@@ -50,6 +50,53 @@ describe GitHub do
     end
   end
 
+  describe "#run get -a" do
+    pages = [
+      [1, 2, 3],
+      [4, 5, 6],
+      [7, 8],
+    ]
+    pag_server = HTTP::Server.new do |context|
+      request, response = context.request, context.response
+      next response.respond_with_status(HTTP::Status::UNAUTHORIZED) unless request.headers["Authorization"]? == "Bearer abc123"
+      page = (request.query_params["page"]? || "1").to_i
+      data = pages[page - 1]? || ([] of Int32)
+      base = URI.parse("http://#{request.headers["Host"]}#{request.path}")
+      if pages.size > 1
+        links = [] of String
+        links << %(<#{base}?page=#{page + 1}&per_page=3>; rel="next") if page < pages.size
+        links << %(<#{base}?page=#{page - 1}&per_page=3>; rel="prev") if page > 1
+        links << %(<#{base}?page=1&per_page=3>; rel="first")
+        links << %(<#{base}?page=#{pages.size}&per_page=3>; rel="last")
+        response.headers["Link"] = links.join(", ")
+      end
+      response.content_type = "application/json"
+      data.to_json(response)
+    end
+    pag_addr = pag_server.bind_unused_port
+    pag_gh = GitHub.new(URI.parse("http://#{pag_addr}"), -> { "abc123" })
+    pag_wg = WaitGroup.new
+
+    before_all { pag_wg.spawn { pag_server.listen } }
+    after_all { pag_server.close; pag_wg.wait }
+
+    it "fetches all pages and outputs a JSON array" do
+      stdout = IO::Memory.new
+      code = pag_gh.run(["get", "-a", "items"], output: stdout)
+      code.should eq 0
+      items = JSON.parse(stdout.to_s).as_a.map(&.as_i)
+      items.should eq [1, 2, 3, 4, 5, 6, 7, 8]
+    end
+
+    it "fetches only the first page without -a" do
+      stdout = IO::Memory.new
+      code = pag_gh.run(["get", "items"], output: stdout)
+      code.should eq 0
+      items = JSON.parse(stdout.to_s).as_a.map(&.as_i)
+      items.should eq [1, 2, 3]
+    end
+  end
+
   describe "#get" do
     it "gets a resource" do
       response = gh.get("foo")
