@@ -124,6 +124,61 @@ describe GitHub do
     {% end %}
   end
 
+  describe "#run issue" do
+    tmpdir = File.tempname("git-hub-issues")
+
+    before_all do
+      Dir.mkdir(tmpdir)
+      Dir.cd(tmpdir) do
+        Process.run("git", %w(init))
+        Process.run("git", ["remote", "add", "origin", "https://github.com/bjjb/git-hub.git"])
+      end
+    end
+
+    after_all { FileUtils.rm_rf(tmpdir) }
+
+    it "lists issues for the current repo" do
+      stdout = IO::Memory.new
+      code = Dir.cd(tmpdir) { gh.run(["issue", "list"], output: stdout) }
+      code.should eq 0
+      json = JSON.parse(stdout.to_s)
+      json["uri"].as_s.should contain "/repos/bjjb/git-hub/issues"
+      json["method"].should eq "GET"
+    end
+
+    it "gets a specific issue by number" do
+      stdout = IO::Memory.new
+      code = Dir.cd(tmpdir) { gh.run(["issue", "42"], output: stdout) }
+      code.should eq 0
+      json = JSON.parse(stdout.to_s)
+      json["uri"].as_s.should contain "/repos/bjjb/git-hub/issues/42"
+    end
+
+    it "gets multiple issues in parallel" do
+      stdout = IO::Memory.new
+      code = Dir.cd(tmpdir) { gh.run(["issue", "1", "2"], output: stdout) }
+      code.should eq 0
+      body = stdout.to_s
+      body.should contain "/repos/bjjb/git-hub/issues/1"
+      body.should contain "/repos/bjjb/git-hub/issues/2"
+    end
+
+    it "errors when not in a repo directory" do
+      other = File.tempname("not-a-repo")
+      Dir.mkdir(other)
+      stderr = IO::Memory.new
+      code = Dir.cd(other) { gh.run(["issue", "list"], error: stderr) }
+      code.should eq 1
+      FileUtils.rm_rf(other)
+    end
+
+    it "errors with no subcommand" do
+      stderr = IO::Memory.new
+      code = Dir.cd(tmpdir) { gh.run(["issue"], error: stderr) }
+      code.should eq 1
+    end
+  end
+
   describe %(.git(String)) do
     tmpdir = File.tempname("git-hub")
     name = "foo"

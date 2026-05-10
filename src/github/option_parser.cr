@@ -373,6 +373,55 @@ class GitHub
           end
         end
       end
+      op.on "issue", "manages issues" do
+        all = false
+        op.banner = <<-EOT
+        Usage: #{prog} issue COMMAND [options]
+            Manages issues for the current repo.
+        Commands:
+            list           List open issues
+            NUMBER...      Get specific issues by number
+        Examples:
+            # List open issues
+            #{prog} issue list
+
+            # List all issues across all pages
+            #{prog} issue list -a
+
+            # Get issue #42
+            #{prog} issue 42
+
+            # Get issues #1 and #2
+            #{prog} issue 1 2
+        Options:
+        EOT
+        op.on("-a", "--all", "fetch all pages") { all = true }
+        op.unknown_args do |args, xargs|
+          next if done?
+          command = args.shift? || raise CLI::Error.new(op.to_s, 1)
+          repo = repo? || raise CLI::Error.new("Not in a repo directory.", 1)
+          full_name = repo.full_name
+          case command
+          when "list"
+            q = GitHub.parse_assignments(xargs, {} of String => Array(String))
+            resource = "repos/#{full_name}/issues"
+            if all
+              self.paginate(resource, q).each.to_json(output)
+            else
+              response = get(resource, q)
+              raise CLI::Error.new(nil, 1) unless response.status.success?
+              response.body.to_s(output)
+            end
+          else
+            numbers = [command] + args
+            parallel(numbers) do |number|
+              response = get("repos/#{full_name}/issues/#{number}")
+              raise CLI::Error.new(nil, 1) unless response.status.success?
+              response.body
+            end.each(&.to_s(output))
+          end
+        end
+      end
     end
   end
 end
