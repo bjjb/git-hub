@@ -215,6 +215,50 @@ describe GitHub do
     {% end %}
   end
 
+  describe "#run push" do
+    tmpdir = File.tempname("git-hub-push")
+
+    before_all do
+      Dir.mkdir(tmpdir)
+      Dir.cd(tmpdir) do
+        Process.run("git", %w(init))
+        Process.run("git", ["remote", "add", "origin", "git@github.com:bjjb/new-repo.git"])
+      end
+    end
+
+    after_all { FileUtils.rm_rf(tmpdir) }
+
+    it "creates a private repo by default via API when --create is given" do
+      stdout = IO::Memory.new
+      stderr = IO::Memory.new
+      Dir.cd(tmpdir) { gh.run(["push", "--create"], output: stdout, error: stderr) }
+      json = JSON.parse(stdout.to_s)
+      json["method"].should eq "POST"
+      json["uri"].as_s.should contain "user/repos"
+      body = JSON.parse(json["body"].as_s)
+      body["name"].should eq "new-repo"
+      body["private"].as_bool.should be_true
+    end
+
+    it "creates a public repo when --public is given" do
+      stdout = IO::Memory.new
+      Dir.cd(tmpdir) { gh.run(["push", "--create", "--public"], output: stdout) }
+      json = JSON.parse(stdout.to_s)
+      body = JSON.parse(json["body"].as_s)
+      body["private"].as_bool.should be_false
+    end
+
+    it "errors when not in a repo directory" do
+      other = File.tempname("not-a-repo")
+      Dir.mkdir(other)
+      stderr = IO::Memory.new
+      code = Dir.cd(other) { gh.run(["push", "--create"], error: stderr) }
+      code.should eq 1
+      stderr.to_s.should contain "Not in a repo"
+      FileUtils.rm_rf(other)
+    end
+  end
+
   describe "#run release" do
     tmpdir = File.tempname("git-hub-release")
 

@@ -279,6 +279,50 @@ class GitHub
           end
         end
       end
+      op.on "push", "pushes to the remote, optionally creating the repo" do
+        create = false
+        public = false
+        description = ""
+        op.banner = <<-EOT
+        Usage: #{prog} push [options] [REMOTE] [REFSPEC...]
+            Pushes to the remote. With --create, creates the repo on
+            GitHub first (private by default).
+        Examples:
+            #{prog} push --create
+            #{prog} push --create --public
+        Options:
+        EOT
+        op.on("--create", "create the repo on GitHub first") { create = true }
+        op.on("--public", "make the repo public (with --create)") { public = true }
+        op.on("-d DESC", "--description DESC", "repo description") { |desc| description = desc }
+        op.unknown_args do |args|
+          next if done?
+          repo = repo? || raise CLI::Error.new("Not in a repo directory.", 1)
+          if create
+            name = repo.full_name.split('/').last
+            payload = {
+              name:        name,
+              private:     !public,
+              description: description,
+            }
+            response = post("user/repos", payload)
+            unless response.status.success? || response.status == HTTP::Status::UNPROCESSABLE_ENTITY
+              error.puts "repo create failed: #{response.status} #{response.body}"
+              raise CLI::Error.new(nil, 1)
+            end
+            response.body.to_s(output)
+          end
+          remote = args.shift? || "origin"
+          refspecs = args
+          push_args = ["push", remote] + refspecs
+          push_error = IO::Memory.new
+          status = Process.run("git", push_args, output: output, error: push_error)
+          unless status.success?
+            error.puts push_error.to_s
+            raise CLI::Error.new(nil, 1)
+          end
+        end
+      end
       op.on "current", "gets the current repo or namespace" do
         quiet = false
         show_type = false
