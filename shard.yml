@@ -1,0 +1,19 @@
+name: git-hub
+version: 0.1.0
+description: |
+  A git subcommand for dealing with GitHub projects
+authors:
+  - JJ Buckley <10744+bjjb@users.noreply.github.com>
+homepage: https://github.com/bjjb/git-hub
+license: MIT
+repository: https://github.com/bjjb/git-hub
+
+targets:
+  git-hub:
+    main: src/main.cr
+
+development_dependencies:
+  ameba:
+    github: crystal-ameba/ameba
+
+crystal: ">= 1.19.1"

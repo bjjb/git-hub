@@ -1,0 +1,14 @@
+Documentation/Documentation:
+  Enabled: true
+
+Layout/LineLength:
+  Enabled: true
+
+Lint/ComparisonToBoolean:
+  Enabled: true
+
+Style/GuardClause:
+  Enabled: true
+
+Style/LargeNumbers:
+  Enabled: true

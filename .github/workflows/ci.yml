@@ -1,0 +1,34 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    container: crystallang/crystal:1.19.1-alpine
+    steps:
+      - run: git clone --depth 1 $GITHUB_SERVER_URL/$GITHUB_REPOSITORY .
+      - run: crystal tool format --check
+      - run: apk add --no-cache tar zstd
+      - uses: actions/cache@v5
+        with:
+          path: |
+            lib
+            bin
+          key: shards-${{ hashFiles('shard.lock') }}
+      - run: shards install
+      - run: bin/ameba -f json
+
+  test:
+    runs-on: ubuntu-latest
+    container: crystallang/crystal:1.19.1-alpine
+    steps:
+      - run: git clone --depth 1 $GITHUB_SERVER_URL/$GITHUB_REPOSITORY .
+      - run: apk add --no-cache tar zstd
+      - uses: actions/cache@v5
+        with:
+          path: |
+            lib
+            bin
+          key: shards-${{ hashFiles('shard.lock') }}
+      - run: shards install
+      - run: crystal spec --tap
