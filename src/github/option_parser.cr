@@ -61,10 +61,26 @@ class GitHub
     into
   end
 
+  # Raised when a request body is expected but stdin is a TTY.
+  class NoBodyError < Error; end
+
+  EMPTY_BODY = ""
+
+  # Resolves the request body from xargs or stdin.
+  # Warns on stderr and returns EMPTY_BODY when stdin
+  # is a TTY and no attributes are given.
+  private def resolve_body(xargs, input : IO) : String
+    xargs.empty? ? body(input) : body(xargs)
+  rescue NoBodyError
+    error.puts "Warning: sending request with no body"
+    EMPTY_BODY
+  end
+
   # Builds a request body by reading from an IO.
+  # Raises `NoBodyError` when stdin is a TTY.
   private def body(io : IO) : String
     if io.responds_to?(:tty?) && io.tty?
-      raise CLI::Error.new("No input provided. Pipe a JSON body or pass attributes after '--'.", 1)
+      raise NoBodyError.new
     end
     io.gets_to_end
   rescue ex : IO::Error
@@ -209,7 +225,7 @@ class GitHub
         Options:
         EOT
         op.unknown_args do |args, xargs|
-          b = xargs.empty? ? body(input) : body(xargs)
+          b = resolve_body(xargs, input)
           parallel(args) do |resource|
             response = post(resource, b)
             raise CLI::Error.new(nil, 1) unless response.status.success?
@@ -225,7 +241,7 @@ class GitHub
         Options:
         EOT
         op.unknown_args do |args, xargs|
-          b = xargs.empty? ? body(input) : body(xargs)
+          b = resolve_body(xargs, input)
           parallel(args) do |resource|
             response = put(resource, b)
             raise CLI::Error.new(nil, 1) unless response.status.success?
@@ -241,7 +257,7 @@ class GitHub
         Options:
         EOT
         op.unknown_args do |args, xargs|
-          b = xargs.empty? ? body(input) : body(xargs)
+          b = resolve_body(xargs, input)
           parallel(args) do |resource|
             response = patch(resource, b)
             raise CLI::Error.new(nil, 1) unless response.status.success?

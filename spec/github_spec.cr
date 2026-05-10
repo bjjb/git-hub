@@ -112,13 +112,13 @@ describe GitHub do
         code.should eq 0
       end
 
-      it "errors when stdin is a TTY and no attributes are given" do
+      it "warns and sends empty body when stdin is a TTY and no attributes are given" do
         stdin = TTYMemory.new
         stdout = IO::Memory.new
         stderr = IO::Memory.new
         code = gh.run(["{{method.id}}", "foo"], input: stdin, output: stdout, error: stderr)
-        code.should eq 1
-        stderr.to_s.should contain "No input provided"
+        code.should eq 0
+        stderr.to_s.should contain "no body"
       end
     end
     {% end %}
