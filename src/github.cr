@@ -35,6 +35,11 @@ class GitHub
     VERSION
   end
 
+  # The most recently observed rate limit, or nil.
+  def rate_limit
+    @rest.rate_limit
+  end
+
   # Gets a resource.
   def get(resource, form = {} of String => Array(String))
     @rest.get(resource, form)
@@ -151,6 +156,10 @@ class GitHub
   rescue ex : CLI::Error
     error.puts(ex.message) if ex.message
     ex.code
+  ensure
+    if (rl = rate_limit) && rl.low?
+      error.puts "Warning: #{rl.remaining}/#{rl.limit} API requests remaining (resets #{rl.reset})"
+    end
   end
 
   # Makes a new GitHub using values from the git configuration under name,

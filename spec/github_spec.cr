@@ -24,6 +24,32 @@ describe GitHub do
   before_all { wg.spawn { server.listen } }
   after_all { server.close; wg.wait }
 
+  describe "rate limit warning" do
+    rl_server = HTTP::Server.new do |context|
+      context.response.headers["Authorization"] = "Bearer abc123"
+      context.response.headers["X-RateLimit-Limit"] = "5000"
+      context.response.headers["X-RateLimit-Remaining"] = "42"
+      context.response.headers["X-RateLimit-Used"] = "4958"
+      context.response.headers["X-RateLimit-Reset"] = (Time.utc + 30.minutes).to_unix.to_s
+      context.response.headers["X-RateLimit-Resource"] = "core"
+      context.response.content_type = "application/json"
+      {ok: true}.to_json(context.response)
+    end
+    rl_addr = rl_server.bind_unused_port
+    rl_gh = GitHub.new(URI.parse("http://#{rl_addr}"), -> { "abc123" })
+    rl_wg = WaitGroup.new
+
+    before_all { rl_wg.spawn { rl_server.listen } }
+    after_all { rl_server.close; rl_wg.wait }
+
+    it "warns on stderr when rate limit is low" do
+      stdout = IO::Memory.new
+      stderr = IO::Memory.new
+      rl_gh.run(["get", "foo"], output: stdout, error: stderr)
+      stderr.to_s.should contain "API requests remaining"
+    end
+  end
+
   describe "#get" do
     it "gets a resource" do
       response = gh.get("foo")

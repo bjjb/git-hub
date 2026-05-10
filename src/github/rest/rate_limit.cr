@@ -32,6 +32,11 @@ record GitHub::REST::RateLimit,
     remaining == 0 && reset > Time.utc
   end
 
+  # True when remaining requests are below 10% of the limit.
+  def low? : Bool
+    limit > 0 && remaining < limit // 10
+  end
+
   # Time to wait before the limit resets, or zero if not exhausted.
   def wait_time : Time::Span
     return Time::Span.zero unless exhausted?

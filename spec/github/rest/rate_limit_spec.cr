@@ -29,9 +29,34 @@ describe GitHub::REST::RateLimit do
     rl.used.should eq 1
     rl.resource.should eq "core"
     rl.exhausted?.should be_false
+    rl.low?.should be_false
 
     server.close
     wg.wait
+  end
+
+  it "reports low when remaining is below 10% of limit" do
+    rl = GitHub::REST::RateLimit.new(
+      limit: 5000, remaining: 499, reset: Time.utc,
+      used: 4501, resource: "core"
+    )
+    rl.low?.should be_true
+  end
+
+  it "does not report low when remaining is above 10%" do
+    rl = GitHub::REST::RateLimit.new(
+      limit: 5000, remaining: 500, reset: Time.utc,
+      used: 4500, resource: "core"
+    )
+    rl.low?.should be_false
+  end
+
+  it "does not report low when limit is zero" do
+    rl = GitHub::REST::RateLimit.new(
+      limit: 0, remaining: 0, reset: Time.utc,
+      used: 0, resource: "core"
+    )
+    rl.low?.should be_false
   end
 
   it "retries on 429" do
