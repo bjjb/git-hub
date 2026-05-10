@@ -5,7 +5,7 @@ module Git
   extend self
 
   def config(name : String, key : String) : String?
-    `git config #{name}.#{key}`.strip.presence
+    run("config", "#{name}.#{key}").strip.presence
   rescue
     nil
   end
@@ -13,7 +13,7 @@ module Git
   # A named git remote and its URL.
   class Remote
     getter name : String
-    getter url : String { `git remote get-url #{@name}`.strip }
+    getter url : String { Git.run("remote", "get-url", @name).strip }
     getter uri : URI { URI.parse(url) }
 
     def initialize(@name)
@@ -21,21 +21,31 @@ module Git
   end
 
   def remotes : Enumerable(Remote)
-    `git remote`.strip.split.map(&.strip).map { |name| Remote.new(name) }
+    run("remote").strip.split.map(&.strip).map { |name| Remote.new(name) }
   end
 
   # Returns the tag before the given ref, or nil.
   def previous_tag(ref = "HEAD") : String?
-    `git describe --tags --abbrev=0 #{ref}^ 2>/dev/null`.strip.presence
+    run("describe", "--tags", "--abbrev=0", "#{ref}^").strip.presence
   rescue
     nil
   end
 
   # Returns a changelog of commit subjects between two refs.
   def log(range : String, format = "%s") : Array(String)
-    `git log --format=#{format} #{range}`.strip.lines.reject(&.blank?)
+    run("log", "--format=#{format}", range).strip.lines.reject(&.blank?)
   rescue
     [] of String
+  end
+
+  # Runs a git command with the given arguments, returning stdout.
+  # Raises on non-zero exit.
+  def run(*args : String) : String
+    output = IO::Memory.new
+    error = IO::Memory.new
+    status = Process.run("git", args.to_a, output: output, error: error)
+    raise error.to_s unless status.success?
+    output.to_s
   end
 
   # Generates a Markdown changelog between a previous tag and a ref.
