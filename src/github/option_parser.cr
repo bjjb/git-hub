@@ -72,8 +72,14 @@ class GitHub
   end
 
   # Builds a request body from KEY=VALUE assignments.
+  # Supports dot notation for nested keys.
   private def body(assignments : Enumerable(String)) : String
-    GitHub.parse_assignments(assignments.to_a, {} of String => String).to_json
+    args = assignments.to_a
+    if args.any?(&.split('=', 2).first.includes?('.'))
+      GitHub::Body.parse_nested(args).to_json
+    else
+      GitHub.parse_assignments(args, {} of String => String).to_json
+    end
   end
 
   # Runs a block for each item in parallel, returning results

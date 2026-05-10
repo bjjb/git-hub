@@ -179,6 +179,21 @@ describe GitHub do
     end
   end
 
+  describe "#run post with nested body" do
+    it "produces nested JSON from dot notation" do
+      stdin = IO::Memory.new("ignored")
+      stdout = IO::Memory.new
+      code = gh.run(
+        ["post", "foo", "--", "a.b.c=enabled", "name=test"],
+        input: stdin, output: stdout
+      )
+      code.should eq 0
+      body = JSON.parse(JSON.parse(stdout.to_s)["body"].as_s)
+      body["a"]["b"]["c"].as_s.should eq "enabled"
+      body["name"].as_s.should eq "test"
+    end
+  end
+
   describe %(.git(String)) do
     tmpdir = File.tempname("git-hub")
     name = "foo"

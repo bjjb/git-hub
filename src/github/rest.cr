@@ -1,4 +1,5 @@
 require "http/client"
+require "json"
 
 # :nodoc:
 class GitHub
